@@ -26,7 +26,7 @@ class CustomerProgramResource extends Resource
 {
     protected static ?string $model = CustomerProgram::class;
 
-        protected static ?string $navigationGroup = 'Loyalty';
+        protected static ?string $navigationGroup = 'Loyalty Management';
     protected static ?string $navigationLabel = 'Program Penjualan';
     protected static ?string $modelLabel       = 'Program PenjualanS';
     protected static ?string $recordTitleAttribute = 'name';

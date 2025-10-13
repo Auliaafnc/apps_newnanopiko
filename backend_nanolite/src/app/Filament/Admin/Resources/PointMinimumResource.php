@@ -18,7 +18,7 @@ class PointMinimumResource extends Resource
     protected static ?string $model = PointMinimum::class;
 
    
-    protected static ?string $navigationGroup = 'Loyalty';
+    protected static ?string $navigationGroup = 'Loyalty Management';
     protected static ?string $navigationLabel = 'Minimum Poin';
     protected static ?string $modelLabel       = 'Minimum Poin';
     public static function getNavigationBadge(): ?string
