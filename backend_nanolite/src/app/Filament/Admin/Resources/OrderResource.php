@@ -13,6 +13,7 @@ use App\Models\CustomerCategories;
 use App\Models\Product;
 use App\Models\Customer;
 use App\Models\PointMinimum;
+use Filament\Forms\Get;
 use Filament\Forms\Form;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Forms\Components\Select;
@@ -20,7 +21,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Textarea;
-use Filament\Resources\Resource;
+use Filament\Resources\Resource; 
 use Filament\Forms\Components\Grid;
 use Filament\Notifications\Notification;
 use Filament\Tables\Table;
@@ -194,53 +195,111 @@ class OrderResource extends Resource
                     ->disabled(fn ($record) => $record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital']))
                     ->reactive(),
 
-               Select::make('customer_program_id')
+            Select::make('customer_program_id')
                 ->label('Program Pelanggan')
                 ->options(fn () => CustomerProgram::pluck('name', 'id'))
                 ->disabled()
                 ->dehydrated()
                 ->searchable(),
 
+            // === DISKON 1 ===
+            TextInput::make('diskon_1')
+            ->label('Diskon 1 (%)')
+            ->numeric()
+            ->live()
+            ->reactive()
+            ->dehydrated(fn (Get $get) => $get('diskons_enabled'))
+            ->disabled(fn (Get $get, $record) =>
+                ! $get('diskons_enabled')
+                || ($record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital']))
+            )
+            ->afterStateUpdated(fn($state, callable $set) => $set('total_harga_after_tax', null))
+            ->default(0)
+            ->helperText('Masukkan persentase diskon pertama (contoh: 10 untuk 10%)'),
 
-                TextInput::make('diskon_1')->label('Diskon 1 (%)')->numeric()->live()->reactive()
-                    ->disabled(fn($get) => ! $get('diskons_enabled'))
-                    ->afterStateUpdated(fn($state, callable $set) => $set('total_harga_after_tax', null))
-                    ->disabled(fn ($record) => $record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital']))
-                    ->default(0)->helperText('Masukkan persentase diskon pertama (contoh: 10 untuk 10%)'),
+        TextInput::make('penjelasan_diskon_1')
+            ->label('Penjelasan Diskon 1')
+            ->nullable()
+            ->dehydrated(fn (Get $get) => $get('diskons_enabled'))
+            ->disabled(fn (Get $get, $record) =>
+                ! $get('diskons_enabled')
+                || ($record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital']))
+            ),
 
-                TextInput::make('penjelasan_diskon_1')->label('Penjelasan Diskon 1')
-                    ->required()->dehydrated()->disabled(fn($get) => ! $get('diskons_enabled'))->nullable()
-                    ->disabled(fn ($record) => $record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital'])),
 
-                TextInput::make('diskon_2')->label('Diskon 2 (%)')->numeric()->live()->reactive()
-                    ->disabled(fn($get) => ! $get('diskons_enabled'))
-                    ->afterStateUpdated(fn($state, callable $set) => $set('total_harga_after_tax', null))
-                    ->disabled(fn ($record) => $record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital']))
-                    ->default(0)->helperText('Masukkan persentase diskon pertama (contoh: 10 untuk 10%)'),
+        // === DISKON 2 ===
+        TextInput::make('diskon_2')
+            ->label('Diskon 2 (%)')
+            ->numeric()
+            ->live()
+            ->reactive()
+            ->dehydrated(fn (Get $get) => $get('diskons_enabled'))
+            ->disabled(fn (Get $get, $record) =>
+                ! $get('diskons_enabled')
+                || ($record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital']))
+            )
+            ->afterStateUpdated(fn($state, callable $set) => $set('total_harga_after_tax', null))
+            ->default(0)
+            ->helperText('Masukkan persentase diskon kedua (contoh: 5 untuk 5%)'),
 
-                TextInput::make('penjelasan_diskon_2')->label('Penjelasan Diskon 2')
-                    ->required()->dehydrated()->disabled(fn($get) => ! $get('diskons_enabled'))->nullable()
-                    ->disabled(fn ($record) => $record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital'])),
+        TextInput::make('penjelasan_diskon_2')
+            ->label('Penjelasan Diskon 2')
+            ->nullable()
+            ->dehydrated(fn (Get $get) => $get('diskons_enabled'))
+            ->disabled(fn (Get $get, $record) =>
+                ! $get('diskons_enabled')
+                || ($record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital']))
+            ),
 
-                TextInput::make('diskon_3')->label('Diskon 3 (%)')->numeric()->live()->reactive()
-                    ->disabled(fn($get) => ! $get('diskons_enabled'))
-                    ->afterStateUpdated(fn($state, callable $set) => $set('total_harga_after_tax', null))
-                    ->disabled(fn ($record) => $record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital']))
-                    ->default(0)->helperText('Masukkan persentase diskon pertama (contoh: 10 untuk 10%)'),
 
-                TextInput::make('penjelasan_diskon_3')->label('Penjelasan Diskon 3')
-                    ->required()->dehydrated()->disabled(fn($get) => ! $get('diskons_enabled'))->nullable()
-                    ->disabled(fn ($record) => $record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital'])),
+        // === DISKON 3 ===
+        TextInput::make('diskon_3')
+            ->label('Diskon 3 (%)')
+            ->numeric()
+            ->live()
+            ->reactive()
+            ->dehydrated(fn (Get $get) => $get('diskons_enabled'))
+            ->disabled(fn (Get $get, $record) =>
+                ! $get('diskons_enabled')
+                || ($record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital']))
+            )
+            ->afterStateUpdated(fn($state, callable $set) => $set('total_harga_after_tax', null))
+            ->default(0)
+            ->helperText('Masukkan persentase diskon ketiga (contoh: 2 untuk 2%)'),
 
-                TextInput::make('diskon_4')->label('Diskon 4 (%)')->numeric()->live()->reactive()
-                    ->disabled(fn($get) => ! $get('diskons_enabled'))
-                    ->afterStateUpdated(fn($state, callable $set) => $set('total_harga_after_tax', null))
-                    ->disabled(fn ($record) => $record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital']))
-                    ->default(0)->helperText('Masukkan persentase diskon pertama (contoh: 10 untuk 10%)'),
+        TextInput::make('penjelasan_diskon_3')
+            ->label('Penjelasan Diskon 3')
+            ->nullable()
+            ->dehydrated(fn (Get $get) => $get('diskons_enabled'))
+            ->disabled(fn (Get $get, $record) =>
+                ! $get('diskons_enabled')
+                || ($record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital']))
+            ),
 
-                TextInput::make('penjelasan_diskon_4')->label('Penjelasan Diskon 4')
-                    ->required()->dehydrated()->disabled(fn($get) => ! $get('diskons_enabled'))->nullable()
-                    ->disabled(fn ($record) => $record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital'])),
+
+        // === DISKON 4 ===
+        TextInput::make('diskon_4')
+            ->label('Diskon 4 (%)')
+            ->numeric()
+            ->live()
+            ->reactive()
+            ->dehydrated(fn (Get $get) => $get('diskons_enabled'))
+            ->disabled(fn (Get $get, $record) =>
+                ! $get('diskons_enabled')
+                || ($record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital']))
+            )
+            ->afterStateUpdated(fn($state, callable $set) => $set('total_harga_after_tax', null))
+            ->default(0)
+            ->helperText('Masukkan persentase diskon keempat (contoh: 1 untuk 1%)'),
+
+        TextInput::make('penjelasan_diskon_4')
+            ->label('Penjelasan Diskon 4')
+            ->nullable()
+            ->dehydrated(fn (Get $get) => $get('diskons_enabled'))
+            ->disabled(fn (Get $get, $record) =>
+                ! $get('diskons_enabled')
+                || ($record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital']))
+            ),
 
 
                 // === Repeater Produk
@@ -497,7 +556,10 @@ class OrderResource extends Resource
                             $set('status_order', 'rejected');
                         }
                     })
-                    ->visible(fn ($record) => auth()->user()->can('updateStatus', $record ?? new \App\Models\Order))
+                   ->visible(fn ($record) =>
+                        auth()->user()->can('updateStatus', $record ?? new \App\Models\Order)
+                        || auth()->user()->hasAnyRole(['admin','manager','head_marketing'])
+                    )
                     ->searchable(),
 
 
@@ -510,7 +572,10 @@ class OrderResource extends Resource
                     ->options([
                         'pending'=>'Pending','ready_stock'=>'Ready Stock','sold_out'=>'Sold Out','rejected'=>'Ditolak',
                     ])
-                    ->visible(fn ($record) => auth()->user()->can('updateStatus', $record ?? new \App\Models\Order))
+                    ->visible(fn ($record) =>
+                        auth()->user()->can('updateStatus', $record ?? new \App\Models\Order)
+                        || auth()->user()->hasAnyRole(['admin','manager','head_marketing'])
+                    )
                     ->default('pending')
                     ->reactive()
                     ->searchable(),
@@ -525,21 +590,38 @@ class OrderResource extends Resource
                     ->maxFiles(5)
                     ->maxSize(102400)
                     ->dehydrated(true)
-                    ->visible(fn ($record) => (bool) $record) 
+                    // hanya tampil saat edit (record sudah ada)
+                    ->visible(fn ($record) => (bool) $record)
+                    // tips untuk role sales jika belum delivered
                     ->helperText(fn ($record, $get) =>
-                        auth()->user()->hasAnyRole(['sales','head_sales','head_digital']) 
-                            && $record 
-                            && $get('status_order') !== 'delivered'
+                        auth()->user()->hasAnyRole(['sales','head_sales','head_digital'])
+                        && $record
+                        && $get('status_order') !== 'delivered'
                             ? 'Bukti pengiriman hanya bisa diunggah setelah status order = Delivered.'
                             : null
                     )
+                    // aturan enable/disable upload
                     ->disabled(function ($record, callable $get) {
-                        if (! $record) return false; // di create: tetap visible = false, jadi tak kepakai
+                        // di halaman create, field tidak dipakai
+                        if (! $record) return true;
+
                         $user = auth()->user();
-                        if ($user->can('updateStatus', $record) || $user->can('updateAll', $record)) return false;
-                        if ($user->hasRole('sales')) {
+
+                        // admin/manager/head_marketing atau user yang punya policy khusus: bebas upload
+                        if (
+                            $user->can('updateStatus', $record)
+                            || $user->can('updateAll', $record)
+                            || $user->hasAnyRole(['admin','manager','head_marketing'])
+                        ) {
+                            return false;
+                        }
+
+                        // sales / head_sales / head_digital hanya boleh saat delivered
+                        if ($user->hasAnyRole(['sales','head_sales','head_digital'])) {
                             return $get('status_order') !== 'delivered';
                         }
+
+                        // default: boleh
                         return false;
                     })
                     ->afterStateUpdated(function ($state, callable $set) {
@@ -547,8 +629,8 @@ class OrderResource extends Resource
                             $set('delivered_at', now());
                             $set('delivered_by', auth()->user()?->employee_id);
                         }
-                    })
-                    ->disabled(fn ($record) => $record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital'])),
+                    }),
+
 
                 
                 Select::make('status_order')
@@ -558,7 +640,10 @@ class OrderResource extends Resource
                         'on_hold'=>'On Hold','delivered'=>'Delivered','completed'=>'Completed',
                         'cancelled'=>'Cancelled','rejected'=>'Ditolak'
                     ])
-                    ->visible(fn ($record) => auth()->user()->can('updateStatus', $record ?? new \App\Models\Order))
+                    ->visible(fn ($record) =>
+                        auth()->user()->can('updateStatus', $record ?? new \App\Models\Order)
+                        || auth()->user()->hasAnyRole(['admin','manager','head_marketing'])
+                    )
                     ->default('pending')
                     ->reactive()   
                     ->searchable(),

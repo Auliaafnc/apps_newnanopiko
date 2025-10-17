@@ -234,21 +234,26 @@ class GaransiResource extends Resource
                             $set('status_garansi', 'rejected');
                         }
                     })
-                    ->visible(fn ($record) => auth()->user()->can('updateStatus', $record ?? new \App\Models\Garansi))
+                   ->visible(fn ($record) =>
+                        auth()->user()->can('updateStatus', $record ?? new \App\Models\Garansi)
+                        || auth()->user()->hasAnyRole(['admin','manager','head_marketing'])
+                    )
                     ->searchable(),
 
 
                 Textarea::make('rejection_comment')
                     ->label('Komentar Ditolak')
-                    ->visible(fn ($get) => $get('status_pengajuan') === 'rejected')
-                                        ->disabled(fn ($record) => $record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital'])),
+                    ->visible(fn ($get) => $get('status_pengajuan') === 'rejected'),
 
                 Select::make('status_product')
                     ->label('Status Produk')
                     ->options([
                         'pending'=>'Pending','ready_stock'=>'Ready Stock','sold_out'=>'Sold Out','rejected'=>'Ditolak',
                     ])
-                    ->visible(fn ($record) => auth()->user()->can('updateStatus', $record ?? new \App\Models\Garansi))
+                    ->visible(fn ($record) =>
+                        auth()->user()->can('updateStatus', $record ?? new \App\Models\Garansi)
+                        || auth()->user()->hasAnyRole(['admin','manager','head_marketing'])
+                    )
                     ->default('pending')
                     ->reactive()
                     ->searchable(),
@@ -263,21 +268,38 @@ class GaransiResource extends Resource
                     ->maxFiles(5)
                     ->maxSize(102400)
                     ->dehydrated(true)
-                    ->visible(fn ($record) => (bool) $record) 
+                    // hanya tampil saat edit (record sudah ada)
+                    ->visible(fn ($record) => (bool) $record)
+                    // tips untuk role sales jika belum delivered
                     ->helperText(fn ($record, $get) =>
-                        auth()->user()->hasAnyRole(['sales','head_sales','head_digital']) 
-                            && $record 
-                            && $get('status_garansi') !== 'delivered'
+                        auth()->user()->hasAnyRole(['sales','head_sales','head_digital'])
+                        && $record
+                        && $get('status_garansi') !== 'delivered'
                             ? 'Bukti pengiriman hanya bisa diunggah setelah status garansi = Delivered.'
                             : null
                     )
+                    // aturan enable/disable upload
                     ->disabled(function ($record, callable $get) {
-                        if (! $record) return false; // di create: tetap visible = false, jadi tak kepakai
+                        // di halaman create, field tidak dipakai
+                        if (! $record) return true;
+
                         $user = auth()->user();
-                        if ($user->can('updateStatus', $record) || $user->can('updateAll', $record)) return false;
-                        if ($user->hasRole('sales')) {
+
+                        // admin/manager/head_marketing atau user yang punya policy khusus: bebas upload
+                        if (
+                            $user->can('updateStatus', $record)
+                            || $user->can('updateAll', $record)
+                            || $user->hasAnyRole(['admin','manager','head_marketing'])
+                        ) {
+                            return false;
+                        }
+
+                        // sales / head_sales / head_digital hanya boleh saat delivered
+                        if ($user->hasAnyRole(['sales','head_sales','head_digital'])) {
                             return $get('status_garansi') !== 'delivered';
                         }
+
+                        // default: boleh
                         return false;
                     })
                     ->afterStateUpdated(function ($state, callable $set) {
@@ -289,19 +311,22 @@ class GaransiResource extends Resource
 
                 
                 Select::make('status_garansi')
-                    ->label('Status Garansi')
+                    ->label('Status Proses Garansi')
                     ->options([
                         'pending'=>'Pending','confirmed'=>'Confirmed','processing'=>'Processing',
                         'on_hold'=>'On Hold','delivered'=>'Delivered','completed'=>'Completed',
                         'cancelled'=>'Cancelled','rejected'=>'Ditolak'
                     ])
-                    ->visible(fn ($record) => auth()->user()->can('updateStatus', $record ?? new \App\Models\Garansi))
+                    ->visible(fn ($record) =>
+                        auth()->user()->can('updateStatus', $record ?? new \App\Models\Garansi)
+                        || auth()->user()->hasAnyRole(['admin','manager','head_marketing'])
+                    )
                     ->default('pending')
                     ->reactive()   
                     ->searchable(),
 
 
-               Textarea::make('on_hold_comment')
+                Textarea::make('on_hold_comment')
                     ->label('Alasan di Hold')
                     ->visible(fn ($get) => $get('status_garansi') === 'on_hold')
                     ->required(fn ($get) => $get('status_garansi') === 'on_hold')
@@ -311,13 +336,13 @@ class GaransiResource extends Resource
                     ->label('Batas On Hold')
                     ->visible(fn ($get) => $get('status_garansi') === 'on_hold')
                     ->required(fn ($get) => $get('status_garansi') === 'on_hold')
-                    ->minDate(today()),
+                    ->minDate(today())
+                                        ->disabled(fn ($record) => $record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital'])),
 
 
                 Textarea::make('cancelled_comment')->label('Komentar Cancelled')
                     ->visible(fn ($get) => $get('status_garansi') === 'cancelled'),
             
-
              
                 Hidden::make('delivered_by')
                     ->dehydrated(fn ($record) => (bool) $record),

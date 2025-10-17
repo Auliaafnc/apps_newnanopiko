@@ -224,6 +224,23 @@ class CustomerResource extends Resource
     {
         return $table
             ->defaultSort('created_at', 'desc') 
+            ->modifyQueryUsing(function ($query) {
+                // Order yang dianggap menghasilkan poin
+                $done = ['completed', 'delivered'];
+
+                $query
+                    // total reward point dari orders
+                    ->withSum(['orders as reward_point_sum' => function ($q) use ($done) {
+                        $q->whereIn('status_order', $done)
+                        ->where('status_pengajuan', 'approved'); // opsional: hanya yang disetujui
+                    }], 'reward_point')
+                    // total program point dari orders
+                    ->withSum(['orders as program_point_sum' => function ($q) use ($done) {
+                        $q->whereIn('status_order', $done)
+                        ->where('status_pengajuan', 'approved'); // opsional
+                    }], 'jumlah_program');
+            })
+
             ->columns([
                 TextColumn::make('id')->label('ID')->sortable(),
 
@@ -252,15 +269,17 @@ class CustomerResource extends Resource
                     ->getStateUsing(fn ($record) => $record->customerProgram->name ?? '-')
                     ->sortable(),
 
-                TextColumn::make('jumlah_program')
+                TextColumn::make('program_point_sum')
                     ->label('Program Point')
-                    ->getStateUsing(fn ($record) => $record->jumlah_program ?? 0)
-                    ->sortable()->alignCenter(),
-
-                TextColumn::make('reward_point')
+                    ->getStateUsing(fn ($record) => (int) ($record->program_point_sum ?? 0))
+                    ->alignCenter()
+                    ->sortable(),
+                TextColumn::make('reward_point_sum')
                     ->label('Reward Point')
-                    ->getStateUsing(fn ($record) => $record->reward_point ?? 0)
-                    ->sortable()->alignCenter(),
+                    ->getStateUsing(fn ($record) => (int) ($record->reward_point_sum ?? 0))
+                    ->alignCenter()
+                    ->sortable(),
+
 
                 ImageColumn::make('image')
                     ->label('Gambar')

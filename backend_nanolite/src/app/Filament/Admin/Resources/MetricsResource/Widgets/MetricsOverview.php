@@ -50,7 +50,7 @@ class MetricsOverview extends BaseWidget
                 ->color('danger')
                 ->url(ProductReturnResource::getUrl('index')),
 
-            Card::make('Customers', $pendingCustomer)
+            Card::make('Customer Pending', $pendingCustomer)
                 ->description('Pengajuan customer menunggu disetujui')
                 ->icon('heroicon-o-user')
                 ->color('info')
