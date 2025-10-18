@@ -110,6 +110,8 @@ class ProductResource extends Resource
                 FileUpload::make('image')
                     ->label('Product Image')
                     ->image()
+                    ->downloadable()
+                    ->openable()
                     ->directory('products')
                     ->nullable(),
 
@@ -132,6 +134,8 @@ class ProductResource extends Resource
                 TextColumn::make('id')
                     ->label('ID')
                     ->sortable(),
+
+                
 
                 TextColumn::make('brand.name')
                     ->label('Brand')
@@ -165,11 +169,11 @@ class ProductResource extends Resource
                     ->getStateUsing(fn ($record) => $record->description ?: '-')
                     ->toggleable(),
 
-
                 ImageColumn::make('image')
                     ->label('Gambar Produk')
                     ->square()
                     ->circular(),
+                
                 
                 TextColumn::make('status')
                     ->label('Status')
@@ -207,6 +211,16 @@ class ProductResource extends Resource
                                 ->options(function () {
                                         return Category::where('status', 'active')->pluck('name', 'id');
                                     }),
+
+                            
+                            Select::make('colors')
+                                 ->label('Warna Produk')
+                                 ->options([
+                                     '3000K' => '3000K',
+                                     '4000K' => '4000K',
+                                     '6500K' => '6500K',
+                                 ])
+                                 ->searchable(),
                                 
 
                             Select::make('status')
@@ -223,11 +237,28 @@ class ProductResource extends Resource
                         ])
                     ])
                     ->action(function (array $data) {
-                        $export = new ProductExport($data);
-                        $rows = $export->array();
+                        // Susun query sesuai filter
+                        $query = Product::query();
 
-                        if (count($rows) <= 2) {
-                            \Filament\Notifications\Notification::make()
+                        if (empty($data['export_all'])) {
+                            if (!empty($data['brand_id'])) {
+                                $query->where('brand_id', $data['brand_id']);
+                            }
+                            if (!empty($data['category_id'])) {
+                                $query->where('category_id', $data['category_id']);
+                            }
+                            if (!empty($data['status'])) {
+                                $query->where('status', $data['status']);
+                            }
+                            if (!empty($data['colors'])) {
+                                // Pastikan kolom 'colors' di model di-cast ke array & bertipe JSON di DB
+                                $query->whereJsonContains('colors', $data['colors']);
+                            }
+                        }
+
+                        // Jika tidak ada data, kirim notifikasi & hentikan proses
+                        if (!$query->exists()) {
+                            Notification::make()
                                 ->title('Data Produk Tidak Ditemukan')
                                 ->body('Tidak ditemukan data produk berdasarkan filter yang Anda pilih. Silakan periksa kembali pilihan filter Anda.')
                                 ->danger()
@@ -236,8 +267,10 @@ class ProductResource extends Resource
                             return null;
                         }
 
-                        return Excel::download($export, 'export_product.xlsx');
+                        // Jika ada data, lanjutkan export seperti biasa
+                        return Excel::download(new ProductExport($data), 'export_product.xlsx');
                     })
+
             ])
     
 

@@ -78,6 +78,8 @@ class CategoryResource extends Resource
             FileUpload::make('image')
                 ->label('Gambar Kategori')
                 ->image()
+                ->downloadable()
+                ->openable()
                 ->directory('category-logos')
                 ->maxSize(2048),
         ]);
@@ -91,6 +93,8 @@ class CategoryResource extends Resource
             TextColumn::make('id')
                 ->label('ID')
                 ->sortable(),
+
+            
 
             TextColumn::make('brand.name')
                 ->label('Brand')
@@ -115,10 +119,12 @@ class CategoryResource extends Resource
                     ->sortable()
                     ->alignCenter(),
                 
+            
             ImageColumn::make('image')
                 ->label('Gambar')
+
                 ->circular(),
-            
+
             TextColumn::make('status')
                     ->label('Status')
                     ->badge()

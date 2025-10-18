@@ -585,6 +585,9 @@ class OrderResource extends Resource
                     ->label('Bukti Pengiriman')
                     ->multiple()
                     ->image()
+                    ->panelLayout('grid')
+                    ->downloadable()
+                    ->openable()
                     ->disk('public')
                     ->directory('order-delivery-photos')
                     ->maxFiles(5)
@@ -724,18 +727,21 @@ class OrderResource extends Resource
                 TextColumn::make('customerProgram.name')->label('Program Pelanggan')->searchable()
                     ->getStateUsing(fn ($record) => $record->customerProgram->name ?? '-'),
 
-                TextColumn::make('jumlah_program')->label('Program Point')->alignCenter()
+                TextColumn::make('jumlah_program')->label('Program Point')
+                    
                     ->formatStateUsing(fn ($state) => !$state ? '-' : "{$state}"),
 
-                TextColumn::make('reward_point')->label('Reward Point')->alignCenter()
+                TextColumn::make('reward_point')->label('Reward Point')
+                    
                     ->formatStateUsing(fn ($state) => !$state ? '-' : "{$state}"),
 
                 TextColumn::make('total_harga_after_tax')->label('Total Akhir')
                     ->formatStateUsing(fn ($state) => 'Rp ' . number_format($state, 0, ',', '.'))
                     ->sortable(),
 
-                TextColumn::make('payment_method')->label('Metode Pembayaran')->alignCenter()->searchable()->sortable(),
-                TextColumn::make('payment_due_until')->label('Jatuh Tempo')->alignCenter()->searchable()->sortable(),
+                TextColumn::make('payment_method')->label('Metode Pembayaran')->searchable()->sortable(),
+                TextColumn::make('payment_due_until')->label('Jatuh Tempo')->searchable()->sortable(),
+                
                 
                 ImageColumn::make('delivery_images')->label('Bukti Pengiriman')->circular()->stacked()->limit(3),
 
@@ -747,6 +753,7 @@ class OrderResource extends Resource
                         'sudah lunas' => 'Sudah lunas',
                         default => ucfirst($state),
                     })
+                    
                     ->colors(['warning' => 'belum bayar','success' => 'sudah bayar'])
                     ->sortable(),
 
@@ -755,6 +762,7 @@ class OrderResource extends Resource
                         'pending' => 'Pending', 'approved' => 'Disetujui', 'rejected' => 'Ditolak',
                         default => ucfirst($state),
                     })
+                    
                     ->colors(['warning' => 'pending','success' => 'approved','danger' => 'rejected'])
                     ->sortable(),
 
@@ -763,6 +771,7 @@ class OrderResource extends Resource
                         'pending' => 'Pending', 'ready_stock' => 'Ready Stock',
                         'sold_out' => 'Sold Out', 'rejected' => 'Ditolak', default => ucfirst($state),
                     })
+                    
                     ->colors(['warning' => 'pending','success' => 'ready_stock','danger' => ['sold_out','rejected']])
                     ->sortable(),
 
@@ -772,14 +781,16 @@ class OrderResource extends Resource
                         'on_hold' => 'On Hold','delivered' => 'Delivered','completed' => 'Completed',
                         'cancelled' => 'Cancelled','rejected' => 'Ditolak', default => ucfirst($state),
                     })
+                    
                     ->colors([
                         'warning' => ['pending','on_hold'],
                         'info'    => ['confirmed','processing','delivered'],
                         'success' => 'completed',
                         'danger'  => ['cancelled','rejected'],
                     ])->sortable(),
-                TextColumn::make('on_hold_until')->label('Batas Hold')->alignCenter()->searchable()->sortable(), // new
-                
+                TextColumn::make('on_hold_until')->label('Batas Hold')->searchable()->sortable(), // new
+                TextColumn::make('on_hold_comment')->label('Alasan di Hold')->searchable()->sortable(), // new
+
 
                 TextColumn::make('created_at')->label('Dibuat')->dateTime('d M Y H:i')->sortable(),
                 TextColumn::make('updated_at')->label('Diupdate')->dateTime('d M Y H:i')->sortable(),

@@ -189,6 +189,9 @@ class ProductReturnResource extends Resource
                     ->label('Foto Barang')
                     ->multiple()
                     ->image()
+                    ->panelLayout('grid')
+                    ->downloadable()
+                    ->openable()
                     ->disk('public') 
                     ->directory('return-photos')
                     ->maxFiles(5)
@@ -390,6 +393,9 @@ class ProductReturnResource extends Resource
                     ->label('Bukti Pengiriman')
                     ->multiple()
                     ->image()
+                    ->panelLayout('grid')
+                    ->downloadable()
+                    ->openable()
                     ->disk('public')
                     ->directory('return-delivery-photos')
                     ->maxFiles(5)
@@ -526,7 +532,8 @@ class ProductReturnResource extends Resource
                     'danger'  => ['cancelled','rejected'],
                 ])
                 ->sortable(),
-
+                TextColumn::make('on_hold_until')->label('Batas Hold')->searchable()->sortable(), // new
+                TextColumn::make('on_hold_comment')->label('Alasan di Hold')->searchable()->sortable(), // new
                 TextColumn::make('created_at')->label('Dibuat Pada')->dateTime('d M Y H:i')->sortable(),
                 TextColumn::make('updated_at')->label('Diupdate')->dateTime('d M Y H:i')->sortable(),
             ])

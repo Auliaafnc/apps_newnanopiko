@@ -213,6 +213,9 @@ class GaransiResource extends Resource
                     ->label('Foto Barang')
                     ->multiple()
                     ->image()
+                    ->panelLayout('grid')
+                    ->downloadable()
+                    ->openable()
                     ->disk('public') 
                     ->directory('garansi-photos')
                     ->maxFiles(5)
@@ -263,6 +266,9 @@ class GaransiResource extends Resource
                     ->label('Bukti Pengiriman')
                     ->multiple()
                     ->image()
+                    ->panelLayout('grid')
+                    ->downloadable()
+                    ->openable()
                     ->disk('public')
                     ->directory('garansi-delivery-photos')
                     ->maxFiles(5)
@@ -428,7 +434,8 @@ class GaransiResource extends Resource
                     'danger'  => ['cancelled','rejected'],
                 ])
                 ->sortable(),
-
+                TextColumn::make('on_hold_until')->label('Batas Hold')->searchable()->sortable(), // new
+                TextColumn::make('on_hold_comment')->label('Alasan di Hold')->searchable()->sortable(), // new
                 TextColumn::make('created_at')->label('Dibuat Pada')->dateTime('d M Y H:i')->sortable(),
                 TextColumn::make('updated_at')->label('Diupdate')->dateTime('d M Y H:i')->sortable(),
             ])

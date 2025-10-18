@@ -129,6 +129,8 @@ class CompanyResource extends Resource
             Forms\Components\FileUpload::make('image')
                 ->label('Logo / Gambar Perusahaan')
                 ->image()
+                ->downloadable()
+                ->openable()
                 ->directory('company-logos')
                 ->maxSize(2048),
         ]);

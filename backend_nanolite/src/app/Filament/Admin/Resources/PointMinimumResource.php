@@ -124,6 +124,61 @@ class PointMinimumResource extends Resource
                 TernaryFilter::make('is_active')
                     ->label('Aktif'),
             ])
+            ->headerActions([
+    Tables\Actions\Action::make('export')
+        ->label('Export Minimum Poin')
+        ->form([
+            \Filament\Forms\Components\Grid::make(3)->schema([
+                \Filament\Forms\Components\Select::make('type')
+                    ->label('Jenis')
+                    ->options([
+                        'reward'  => 'Reward',
+                        'program' => 'Program',
+                    ])
+                    ->native(false)
+                    ->searchable(),
+
+                \Filament\Forms\Components\Select::make('is_active')
+                    ->label('Aktif')
+                    ->options([
+                        ''  => 'Semua',
+                        '1' => 'Aktif',
+                        '0' => 'Nonaktif',
+                    ])
+                    ->default('')
+                    ->native(false),
+
+                \Filament\Forms\Components\Checkbox::make('export_all')
+                    ->label('Print Semua Data')
+                    ->reactive(),
+            ]),
+        ])
+        ->action(function (array $data) {
+            // Jika tidak centang "Print Semua Data", terapkan filter dari form
+            $filters = [];
+            if (empty($data['export_all'])) {
+                $filters = [
+                    'type'      => $data['type']      ?? null,
+                    'is_active' => $data['is_active'] ?? '',
+                ];
+            }
+
+            $export = new \App\Exports\PointMinimumExport($filters);
+            $rows = $export->array();
+
+            if (count($rows) <= 2) {
+                \Filament\Notifications\Notification::make()
+                    ->title('Data Tidak Ditemukan')
+                    ->body('Tidak ada data sesuai filter yang dipilih.')
+                    ->danger()
+                    ->send();
+                return null;
+            }
+
+            return \Maatwebsite\Excel\Facades\Excel::download($export, 'export_minimum_poin.xlsx');
+        }),
+])
+
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),

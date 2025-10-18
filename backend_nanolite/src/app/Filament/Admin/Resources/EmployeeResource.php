@@ -128,7 +128,7 @@ class EmployeeResource extends Resource
                     ->columns(3)->defaultItems(1)
                     ->disableItemCreation()->disableItemDeletion()->dehydrated(),
 
-                FileUpload::make('photo')->label('Foto')->image()->directory('employee-photos')->maxSize(2048),
+                FileUpload::make('photo')->label('Foto')->image()->downloadable()->openable()->directory('employee-photos')->maxSize(2048),
 
                 Select::make('status')->label('Status')
                     ->options(['active' => 'Aktif', 'non-active' => 'Nonaktif'])

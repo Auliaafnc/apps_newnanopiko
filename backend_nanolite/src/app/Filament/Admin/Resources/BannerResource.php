@@ -35,27 +35,37 @@ class BannerResource extends Resource
                 FileUpload::make('image_1')
                     ->label('Gambar 1')
                     ->image()
+                    ->downloadable()
+                    ->openable()
                     ->directory('Banner-photos')
                     ->maxSize(2048),
 
                 FileUpload::make('image_2')
                     ->label('Gambar 2')
                     ->image()
+                    ->downloadable()
+                    ->openable()
                     ->directory('Banner-photos')
                     ->maxSize(2048),
 
                 FileUpload::make('image_3')
                     ->label('Gambar 3')
                     ->image()
+                    ->downloadable()
+                    ->openable()
                     ->directory('Banner-photos')
                     ->maxSize(2048),
 
                 FileUpload::make('image_4')
                     ->label('Gambar 4')
                     ->image()
+                    ->downloadable()
+                    ->openable()
                     ->directory('Banner-photos')
                     ->maxSize(2048),
             ]);
+
+            
     }
 
     public static function table(Table $table): Table

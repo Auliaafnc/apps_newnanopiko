@@ -57,8 +57,12 @@ class BrandResource extends Resource
                 FileUpload::make('image')
                     ->label('Gambar Brand')
                     ->image()
+                    ->downloadable()
+                    ->openable()
                     ->directory('Brand-logos')
                     ->maxSize(2048),
+
+                
                 
                 Select::make('status')
                     ->label('Status')
@@ -108,6 +112,8 @@ class BrandResource extends Resource
                 ImageColumn::make('image')
                     ->label('Gambar')
                     ->circular(),
+
+                
 
                 TextColumn::make('status')
                     ->label('Status')
