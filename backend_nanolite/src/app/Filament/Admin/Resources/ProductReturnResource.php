@@ -302,7 +302,8 @@ class ProductReturnResource extends Resource
                     ->disabled(fn ($record) => $record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital']))
                     ->required(),
 
-                                // === status ===
+                // === status ===
+                // === status ===
                 Select::make('status_pengajuan')
                     ->label('Status Pengajuan Return')
                     ->options([
@@ -318,7 +319,10 @@ class ProductReturnResource extends Resource
                             $set('status_return', 'rejected');
                         }
                     })
-                    ->visible(fn ($record) => auth()->user()->can('updateStatus', $record ?? new \App\Models\ProductReturn))
+                   ->visible(fn ($record) =>
+                        auth()->user()->can('updateStatus', $record ?? new \App\Models\ProductReturn)
+                        || auth()->user()->hasAnyRole(['admin','manager','head_marketing'])
+                    )
                     ->searchable(),
 
 
@@ -331,27 +335,34 @@ class ProductReturnResource extends Resource
                     ->options([
                         'pending'=>'Pending','ready_stock'=>'Ready Stock','sold_out'=>'Sold Out','rejected'=>'Ditolak',
                     ])
-                    ->visible(fn ($record) => auth()->user()->can('updateStatus', $record ?? new \App\Models\ProductReturn))
+                    ->visible(fn ($record) =>
+                        auth()->user()->can('updateStatus', $record ?? new \App\Models\ProductReturn)
+                        || auth()->user()->hasAnyRole(['admin','manager','head_marketing'])
+                    )
                     ->default('pending')
                     ->reactive()
                     ->searchable(),
 
 
-
+                
+                
                 Select::make('status_return')
-                    ->label('Status Return')
+                    ->label('Status Proses Return')
                     ->options([
                         'pending'=>'Pending','confirmed'=>'Confirmed','processing'=>'Processing',
                         'on_hold'=>'On Hold','delivered'=>'Delivered','completed'=>'Completed',
                         'cancelled'=>'Cancelled','rejected'=>'Ditolak'
                     ])
-                    ->visible(fn ($record) => auth()->user()->can('updateStatus', $record ?? new \App\Models\ProductReturn))
+                    ->visible(fn ($record) =>
+                        auth()->user()->can('updateStatus', $record ?? new \App\Models\ProductReturn)
+                        || auth()->user()->hasAnyRole(['admin','manager','head_marketing'])
+                    )
                     ->default('pending')
                     ->reactive()   
                     ->searchable(),
 
 
-               Textarea::make('on_hold_comment')
+                Textarea::make('on_hold_comment')
                     ->label('Alasan di Hold')
                     ->visible(fn ($get) => $get('status_return') === 'on_hold')
                     ->required(fn ($get) => $get('status_return') === 'on_hold')
@@ -361,13 +372,20 @@ class ProductReturnResource extends Resource
                     ->label('Batas On Hold')
                     ->visible(fn ($get) => $get('status_return') === 'on_hold')
                     ->required(fn ($get) => $get('status_return') === 'on_hold')
-                    ->minDate(today()),
+                    ->minDate(today())
+                                        ->disabled(fn ($record) => $record && auth()->user()->hasAnyRole(['sales','head_sales','head_digital'])),
 
 
                 Textarea::make('cancelled_comment')->label('Komentar Cancelled')
                     ->visible(fn ($get) => $get('status_return') === 'cancelled'),
-           
+            
+             
+                Hidden::make('delivered_by')
+                    ->dehydrated(fn ($record) => (bool) $record),
 
+                Hidden::make('delivered_at')
+                    ->dehydrated(fn ($record) => (bool) $record),
+                
                 FileUpload::make('delivery_images')
                     ->label('Bukti Pengiriman')
                     ->multiple()
@@ -377,26 +395,38 @@ class ProductReturnResource extends Resource
                     ->maxFiles(5)
                     ->maxSize(102400)
                     ->dehydrated(true)
-                    ->visible(fn ($record) => (bool) $record) 
+                    // hanya tampil saat edit (record sudah ada)
+                    ->visible(fn ($record) => (bool) $record)
+                    // tips untuk role sales jika belum delivered
                     ->helperText(fn ($record, $get) =>
-                        auth()->user()->hasAnyRole(['sales','head_sales','head_digital']) 
-                            && $record 
-                            && $get('status_return') !== 'delivered'
+                        auth()->user()->hasAnyRole(['sales','head_sales','head_digital'])
+                        && $record
+                        && $get('status_return') !== 'delivered'
                             ? 'Bukti pengiriman hanya bisa diunggah setelah status return = Delivered.'
                             : null
                     )
+                    // aturan enable/disable upload
                     ->disabled(function ($record, callable $get) {
-                        if (! $record) return false; 
+                        // di halaman create, field tidak dipakai
+                        if (! $record) return true;
+
                         $user = auth()->user();
 
-                        if ($user->can('updateStatus', $record) || $user->can('updateAll', $record)) {
+                        // admin/manager/head_marketing atau user yang punya policy khusus: bebas upload
+                        if (
+                            $user->can('updateStatus', $record)
+                            || $user->can('updateAll', $record)
+                            || $user->hasAnyRole(['admin','manager','head_marketing'])
+                        ) {
                             return false;
                         }
 
+                        // sales / head_sales / head_digital hanya boleh saat delivered
                         if ($user->hasAnyRole(['sales','head_sales','head_digital'])) {
                             return $get('status_return') !== 'delivered';
                         }
 
+                        // default: boleh
                         return false;
                     })
                     ->afterStateUpdated(function ($state, callable $set) {
@@ -406,13 +436,9 @@ class ProductReturnResource extends Resource
                         }
                     }),
 
-                Hidden::make('delivered_by')
-                    ->dehydrated(fn ($record) => (bool) $record),
-
-                Hidden::make('delivered_at')
-                    ->dehydrated(fn ($record) => (bool) $record),
 
             ]);
+                
     }
 
     public static function table(Table $table): Table
