@@ -103,6 +103,11 @@ use App\Filament\Admin\Resources\PerbaikandataResource\Api\Handlers\DetailHandle
 use App\Filament\Admin\Resources\PerbaikandataResource\Api\Handlers\UpdateHandler     as PerbaikandataUpdateHandler;
 use App\Filament\Admin\Resources\PerbaikandataResource\Api\Handlers\DeleteHandler     as PerbaikandataDeleteHandler;
 
+use App\Filament\Admin\Resources\GaransiResource\Api\Handlers\MeHandler;
+use App\Filament\Admin\Resources\GaransiResource\Api\Handlers\CustomerCategoriesUsedHandler;
+use App\Filament\Admin\Resources\GaransiResource\Api\Handlers\CustomersByEmployeeCategoryHandler;
+use App\Filament\Admin\Resources\GaransiResource\Api\Handlers\ColorsByProductHandler;
+
 Route::post('/auth/login', [AuthController::class, 'login'])->name('api.login');
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -216,6 +221,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{id}',    [PerbaikandataDetailHandler::class,     'handler'])->name('api.perbaikandatas.detail');
         Route::put('/{id}',    [PerbaikandataUpdateHandler::class,     'handler'])->name('api.perbaikandatas.update');
         Route::delete('/{id}', [PerbaikandataDeleteHandler::class,     'handler'])->name('api.perbaikandatas.delete');
+    });
+
+    Route::prefix('admin/garansi')->middleware('auth:sanctum')->group(function () {
+        Route::get('/me', MeHandler::class);
+        Route::get('/customer-categories/used', CustomerCategoriesUsedHandler::class);
+        Route::get('/customers/by-filter', CustomersByEmployeeCategoryHandler::class);
+        Route::get('/colors/by-product', ColorsByProductHandler::class); // opsional
     });
 
     

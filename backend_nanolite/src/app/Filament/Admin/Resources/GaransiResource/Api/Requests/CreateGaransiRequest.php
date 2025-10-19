@@ -27,27 +27,43 @@ class CreateGaransiRequest extends FormRequest
     {
         return [
             // --- field utama ---
-            'no_garansi'             => ['required','string','unique:garansis,no_garansi'],
+            // no_garansi dibuat OTOMATIS di handler → jangan required
+            'no_garansi'             => ['nullable','string','unique:garansis,no_garansi'],
             'company_id'             => ['nullable','exists:companies,id'],
-            'customer_categories_id' => ['nullable','exists:customer_categories,id'],
+
+            'customer_categories_id' => ['required','exists:customer_categories,id'],
             'employee_id'            => ['required','exists:employees,id'],
             'department_id'          => ['required','exists:departments,id'],
             'customer_id'            => ['required','exists:customers,id'],
 
+            // Flutter kirim address sebagai array (akan kita format di handler)
             'address'                => ['required','array'],
-            'phone'                  => ['required','string','max:20'],
+            'phone'                  => ['required','string','max:50'],
 
-            'products'               => ['required','array'],
+            // repeater products
+            'products'                  => ['required','array','min:1'],
+            'products.*.brand_id'       => ['required','integer','exists:brands,id'],
+            'products.*.kategori_id'    => ['required','integer','exists:categories,id'],
+            'products.*.produk_id'      => ['required','integer','exists:products,id'],
+            // warna bisa opsional/“-” dari sisi Flutter → validasikan longgar
+            'products.*.warna_id'       => ['nullable'],
+            'products.*.quantity'       => ['required','numeric','min:1'],
 
-            'purchase_date'          => ['required','date'],
-            'claim_date'             => ['required','date','after_or_equal:purchase_date'],
+            // Tanggal pakai format pasti dari Flutter
+            'purchase_date'          => ['required','date_format:Y-m-d'],
+            'claim_date'             => ['required','date_format:Y-m-d','after_or_equal:purchase_date'],
 
             'reason'                 => ['required','string'],
             'note'                   => ['nullable','string'],
 
-            // JSON gambar (sesuai migration)
+            // ---- Upload gambar ----
+            // a) BACKWARD COMPAT: kalau kamu masih kadang kirim path siap-pakai
             'image'                  => ['nullable','array'],
             'image.*'                => ['string'],
+
+            // b) Jalur BARU dari Flutter: dataURL base64 → akan disimpan ke kolom image (json)
+            'images'                 => ['nullable','array'],
+            'images.*'               => ['string', 'regex:/^data:image\/(png|jpe?g|webp);base64,/i'],
 
             // --- status sesuai migration ---
             'status_pengajuan'       => ['nullable', Rule::in(['pending','approved','rejected'])],
@@ -68,9 +84,9 @@ class CreateGaransiRequest extends FormRequest
             'cancelled_comment'      => ['nullable','string','min:5'],
             'cancelled_by'           => ['nullable','exists:employees,id'],
 
-            // --- bukti delivery (sesuai migration)
+            // --- bukti delivery (jika suatu saat create langsung delivered) ---
             'delivery_images'        => ['nullable','array'],
-            'delivery_images.*'      => ['string'],
+            'delivery_images.*'      => ['string'], // boleh path / dataURL (ditangani handler update nanti)
             'delivered_at'           => ['nullable','date'],
             'delivered_by'           => ['nullable','exists:employees,id'],
 
