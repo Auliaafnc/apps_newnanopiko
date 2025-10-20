@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\PerbaikandataExport;
+use App\Exports\FilteredPerbaikandataExport;
 use App\Models\Concerns\OwnedByEmployee;
 use App\Models\Concerns\LatestFirst;
 
@@ -57,7 +57,7 @@ class Perbaikandata extends Model
         // Export Excel setelah tersimpan
         static::saved(function (Perbaikandata $perbaikandata) {
             $excelFileName = "Perbaikandata-{$perbaikandata->id}.xlsx";
-            Excel::store(new PerbaikandataExport(collect([$perbaikandata])), $excelFileName, 'public');
+             Excel::store(new FilteredPerbaikandataExport(['export_all' => true]), $excelFileName, 'public');
             $perbaikandata->updateQuietly(['perbaikandata_excel' => $excelFileName]);
         });
     }

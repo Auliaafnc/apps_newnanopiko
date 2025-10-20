@@ -843,6 +843,16 @@ class OrderResource extends Resource
                                 ->options(['cash' => 'Cash','tempo' => 'Tempo'])->searchable(),
                             Select::make('status_pembayaran')->label('Status Pembayaran')
                                 ->options(['belum bayar' => 'Belum Bayar','sudah bayar' => 'Sudah Bayar'])->searchable(),
+                            Select::make('status_pengajuan')->label('Status Pengajuan')
+                                ->options(['pending' => 'Pending','approved' => 'Disetujui','rejected' => 'Ditolak'])->searchable(),
+                            Select::make('status_product')->label('Status Produk')
+                                ->options(['pending'=>'Pending','ready_stock'=>'Ready Stock','sold_out'=>'Sold Out','rejected'=>'Ditolak'])->searchable(),
+                            Select::make('status_order')->label('Status Order')
+                                ->options([
+                                    'pending'=>'Pending','confirmed'=>'Confirmed','processing'=>'Processing',
+                                    'on_hold'=>'On Hold','delivered'=>'Delivered','completed'=>'Completed',
+                                    'cancelled'=>'Cancelled','rejected'=>'Ditolak'
+                                ])->searchable(),
                             Select::make('customer_program_id')->label('Program Pelanggan')
                                 ->options(CustomerProgram::pluck('name', 'id'))->searchable()->preload(),
                             Select::make('brand_id')->label('Brand')->searchable()->options(Brand::pluck('name', 'id')),

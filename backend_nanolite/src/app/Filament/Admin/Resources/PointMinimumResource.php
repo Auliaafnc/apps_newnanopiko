@@ -21,6 +21,8 @@ class PointMinimumResource extends Resource
     protected static ?string $navigationGroup = 'Loyalty Management';
     protected static ?string $navigationLabel = 'Minimum Poin';
     protected static ?string $modelLabel       = 'Minimum Poin';
+
+    protected static ?int $navigationSort = 2;
     public static function getNavigationBadge(): ?string
     {
         return static::getModel()::count();
