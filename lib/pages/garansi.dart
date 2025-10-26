@@ -1,11 +1,11 @@
 // lib/pages/garansi.dart
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/garansi_row.dart';
 import '../services/api_service.dart';
 import '../utils/downloader.dart'; // auto-unduh di Web (sama seperti Return)
-import '../widgets/clickable_thumb.dart'; // <-- tambah ini
-
+import '../widgets/clickable_thumb.dart'; // <-- untuk thumbnail klik
 import 'create_garansi.dart';
 import 'create_sales_order.dart';
 import 'home.dart';
@@ -19,6 +19,18 @@ class GaransiScreen extends StatefulWidget {
   State<GaransiScreen> createState() => _GaransiScreenState();
 }
 
+// letakkan di paling atas file, sebelum class _GaransiScreenState
+String humanize(String s) {
+  final t = s.trim().replaceAll('_', ' ');
+  return t.isEmpty
+      ? '-'
+      : t
+          .split(' ')
+          .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1))
+          .join(' ');
+}
+
+
 class _GaransiScreenState extends State<GaransiScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
 
@@ -27,6 +39,28 @@ class _GaransiScreenState extends State<GaransiScreen> {
   String? _error;
 
   String get _q => _searchCtrl.text.trim().toLowerCase();
+
+  String _normalizeStatus(String raw) {
+  var v = (raw.isEmpty ? '' : raw).trim().toLowerCase();
+  v = v.replaceAll(RegExp(r'[_\-]+'), ' '); // snake/kebab -> space
+  v = v.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  // perbaiki typo umum dari backend
+  const corrections = {
+    'reedy stock': 'ready stock', // <- kasus kamu
+  };
+  return corrections[v] ?? v;
+}
+
+String _humanizeStatus(String raw) {
+  final n = _normalizeStatus(raw);
+  if (n.isEmpty) return '-';
+  return n.split(' ').map((w) {
+    if (w.isEmpty) return w;
+    return w[0].toUpperCase() + (w.length > 1 ? w.substring(1) : '');
+  }).join(' ');
+}
+
 
   List<GaransiRow> get _filtered {
     if (_q.isEmpty) return _all;
@@ -44,7 +78,12 @@ class _GaransiScreenState extends State<GaransiScreen> {
         g.reason,
         g.notes,
         g.productDetail,
-        g.status,
+        // === field status/hold baru ikut dicari ===
+        g.statusPengajuan,
+        g.statusProduk,
+        g.statusGaransi,
+        g.batasHold,
+        g.alasanHold,
         g.createdAt,
         g.updatedAt,
       ].join(' ').toLowerCase();
@@ -81,6 +120,57 @@ class _GaransiScreenState extends State<GaransiScreen> {
     }
   }
 
+  bool _isDeliveryStatus(GaransiRow g) {
+  final all = [
+    g.statusProduk,
+    g.statusGaransi,
+    g.statusPengajuan,
+  ].where((e) => e.isNotEmpty).map(_normalizeStatus).join(' ');
+  return all.contains('deliver'); // cover: delivery, delivered, on delivery
+}
+
+
+
+  Future<void> _editBukti(GaransiRow g) async {
+  final picker = ImagePicker();
+  final images = await picker.pickMultiImage(imageQuality: 85);
+if (images.isEmpty) return;
+
+if (!mounted) return; // ← tambahkan
+setState(() => _loading = true);
+
+try {
+  final ok = await ApiService.updateWarrantyDeliveryImages(
+    id: g.id!, files: images,
+  );
+  if (!mounted) return; // ← tambahkan
+  if (ok) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Bukti foto berhasil diperbarui.')),
+    );
+    await _fetch();
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Gagal memperbarui bukti foto (ID: ${g.id}).')),
+    );
+  }
+} catch (e) {
+  if (!mounted) return; // ← tambahkan
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text('Error: $e')),
+  );
+} finally {
+  if (!mounted) return; // ← tambahkan
+  setState(() => _loading = false);
+}
+
+
+  print('Trying update warranty: no=${g.garansiNo}, id=${g.id}');
+
+}
+
+
+
   // ============ Helpers: Filename & Download (sama seperti Return) ============
   String _safeFilename(String raw) =>
       raw.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
@@ -93,42 +183,93 @@ class _GaransiScreenState extends State<GaransiScreen> {
 
   // ============ Status Chip (tetap) ============
   Widget _statusChip(String raw) {
-    final v = (raw.isEmpty ? '-' : raw).toLowerCase();
-    String label;
-    Color bg;
-    switch (v) {
-      case 'approved':
-      case 'disetujui':
-      case 'approve':
-      case 'acc':
-        label = 'Disetujui';
-        bg = Colors.green.withOpacity(0.18);
-        break;
-      case 'rejected':
-      case 'ditolak':
-      case 'reject':
-      case 'tolak':
-        label = 'Ditolak';
-        bg = Colors.red.withOpacity(0.18);
-        break;
-      case 'pending':
-      case 'menunggu':
-      case '-':
-      default:
-        label = 'Pending';
-        bg = Colors.amber.withOpacity(0.18);
-        break;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white24),
-      ),
-      child: Text(label, style: const TextStyle(fontSize: 12, color: Colors.white)),
-    );
+  final norm = _normalizeStatus(raw);
+  String label = _humanizeStatus(raw);
+
+  Color bg;
+  switch (norm) {
+    // approval
+    case 'approved':
+    case 'disetujui':
+    case 'approve':
+    case 'acc':
+      bg = Colors.green.withOpacity(0.18);
+      label = 'Disetujui';
+      break;
+    case 'rejected':
+    case 'ditolak':
+    case 'reject':
+    case 'tolak':
+      bg = Colors.red.withOpacity(0.18);
+      label = 'Ditolak';
+      break;
+
+    // proses/logistik
+    case 'ready stock':
+    case 'ready':
+      bg = Colors.green.withOpacity(0.18);
+      label = 'Ready Stock';
+      break;
+    case 'on delivery':
+    case 'delivery':
+    case 'deliver':
+    case 'dikirim':
+    case 'pengiriman':
+    case 'shipping':
+      bg = Colors.blue.withOpacity(0.18);
+      label = 'On Delivery';
+      break;
+    case 'delivered':
+      bg = Colors.blue.withOpacity(0.18);
+      label = 'Delivered';
+      break;
+    case 'completed':
+    case 'selesai':
+      bg = Colors.green.withOpacity(0.18);
+      label = 'Completed';
+      break;
+    case 'processing':
+    case 'on process':
+    case 'diproses':
+      bg = Colors.amber.withOpacity(0.18);
+      label = 'Processing';
+      break;
+    case 'on hold':
+    case 'hold':
+      bg = Colors.orange.withOpacity(0.20);
+      label = 'On Hold';
+      break;
+    case 'canceled':
+    case 'cancelled':
+    case 'dibatalkan':
+      bg = Colors.red.withOpacity(0.18);
+      label = 'Canceled';
+      break;
+
+    // default → Pending
+    case 'pending':
+    case 'menunggu':
+    case '':
+    case '-':
+    default:
+      bg = Colors.amber.withOpacity(0.18);
+      label = label == '-' ? '-' : 'Pending';
+      break;
   }
+
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(999),
+      border: Border.all(color: Colors.white24),
+    ),
+    child: Text(label, style: const TextStyle(fontSize: 12, color: Colors.white)),
+  );
+}
+
+
+
 
   // ============================ UI ============================
   @override
@@ -393,13 +534,21 @@ class _GaransiScreenState extends State<GaransiScreen> {
           DataColumn(label: Text('Alasan Pengajuan Garansi')),
           DataColumn(label: Text('Catatan Tambahan')),
           DataColumn(label: Text('Detail Produk')),
-          DataColumn(label: Text('Gambar')),
+          DataColumn(label: Text('Gambar Barang')), // dipisah
+          DataColumn(label: Text('Gambar Bukti')),  // dipisah
           DataColumn(label: Text('Dokumen')),
-          DataColumn(label: Text('Status')),
+          // === kolom status/hold baru ===
+          DataColumn(label: Text('Status Pengajuan')),
+          DataColumn(label: Text('Status Produk')),
+          DataColumn(label: Text('Status Garansi')),
+          DataColumn(label: Text('Batas Hold')),
+          DataColumn(label: Text('Alasan Hold')),
+          DataColumn(label: Text('Edit Bukti')),
           DataColumn(label: Text('Tanggal Dibuat')),
           DataColumn(label: Text('Tanggal Diperbarui')),
         ],
         rows: _filtered.map((g) {
+          final canEdit = _isDeliveryStatus(g); 
           return DataRow(cells: [
             _textCell(g.garansiNo, width: 130),
             _textCell(g.department, width: 120),
@@ -412,43 +561,49 @@ class _GaransiScreenState extends State<GaransiScreen> {
             _textCell(g.claimDate, width: 140),
             _textCell(g.reason, width: 180),
             _textCell(g.notes, width: 160),
-            DataCell(
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: g.productDetail
-                  .split('\n')
-                  .map((line) => line.trim())
-                  .where((line) => line.isNotEmpty)
-                  .map((line) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "• ",
-                      style: TextStyle(fontSize: 13, color: Colors.white),
-                    ),
-                    Expanded(
-                      child: Text(
-                        line,
-                        style: const TextStyle(fontSize: 13, color: Colors.white),
-                      ),
-                    ),
-                  ],
-                );
-              }).toList(),
-            ),
-          ),
 
-            // ====== Gambar bulat & klik ======
             DataCell(
-              (g.imageUrl == null || g.imageUrl!.isEmpty)
-                  ? const Text('-')
-                  : ClickableThumb(
-                      url: g.imageUrl!,
-                      heroTag: 'garansi_${g.garansiNo}_${g.createdAt}',
-                      size: 36,
-                    ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: g.productDetail
+                    .split('\n')
+                    .map((line) => line.trim())
+                    .where((line) => line.isNotEmpty)
+                    .map((line) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "• ",
+                        style: TextStyle(fontSize: 13, color: Colors.white),
+                      ),
+                      Expanded(
+                        child: Text(
+                          line,
+                          style: const TextStyle(fontSize: 13, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+
+            // ====== Gambar Barang (SEMUA foto dari imageUrls) ======
+            DataCell(
+              _thumbs(
+                g.imageUrls,
+                heroPrefix: 'garansi_barang_${g.garansiNo}_${g.createdAt}',
+              ),
+            ),
+
+            // ====== Gambar Bukti (SEMUA foto dari deliveryImageUrls) ======
+            DataCell(
+              _thumbs(
+                g.deliveryImageUrls,
+                heroPrefix: 'garansi_bukti_${g.garansiNo}_${g.createdAt}',
+              ),
             ),
 
             // ====== PDF (satu tombol unduh, sama dengan Return) ======
@@ -462,13 +617,49 @@ class _GaransiScreenState extends State<GaransiScreen> {
                   : const Text('-'),
             ),
 
-            // STATUS chip
-            DataCell(_statusChip(g.status)),
+            // ====== status & hold baru ======
+            DataCell(Tooltip(message: g.statusPengajuan, child: _statusChip(g.statusPengajuan))),
+            DataCell(Tooltip(message: g.statusProduk,    child: _statusChip(g.statusProduk))),
+            DataCell(Tooltip(message: g.statusGaransi,   child: _statusChip(g.statusGaransi))),
 
+            _textCell(g.batasHold, width: 140),
+            _textCell(g.alasanHold, width: 160),
+            // ====== Edit Bukti (hanya aktif jika status delivery) ======
+            DataCell(
+              canEdit
+                  ? IconButton(
+                      tooltip: 'Edit Bukti Foto',
+                      icon: const Icon(Icons.edit, color: Colors.lightBlueAccent),
+                      onPressed: () => _editBukti(g),
+                    )
+                  : const Text('-', style: TextStyle(color: Colors.white70)),
+            ),
             _textCell(g.createdAt, width: 120),
             _textCell(g.updatedAt, width: 120),
           ]);
         }).toList(),
+      ),
+    );
+  }
+
+  // helper thumbnails (dipakai di kolom gambar)
+  Widget _thumbs(List<String> urls, {required String heroPrefix}) {
+    if (urls.isEmpty) {
+      return const Text('-', style: TextStyle(color: Colors.white70));
+    }
+    return SizedBox(
+      width: 220,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: List.generate(urls.length, (i) {
+          final u = urls[i];
+          return ClickableThumb(
+            url: u,
+            heroTag: '$heroPrefix-$i',
+            size: 36, // diameter bulat
+          );
+        }),
       ),
     );
   }

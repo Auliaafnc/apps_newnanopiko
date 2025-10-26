@@ -1486,7 +1486,7 @@ static Future<bool> createReturn({
 
   // ---------- WARRANTIES ----------
   /// POST garansi pakai JSON (bukan multipart) agar 'products' & 'address' terbaca sebagai array
-  static Future<bool> createWarranty({
+    static Future<bool> createWarranty({
     required int companyId,
     required int departmentId,
     required int employeeId,
@@ -1496,13 +1496,13 @@ static Future<bool> createReturn({
     required List<Map<String, dynamic>> address,
     required List<Map<String, dynamic>> products,
     required String purchaseDate, // YYYY-MM-DD
-    required String claimDate, // YYYY-MM-DD
+    required String claimDate,    // YYYY-MM-DD
     String? reason,
     String? note,
-    String status = 'pending',
-    String? imagePath, // opsional; string path
+    String status = 'pending',    // ← biarkan parameter lama demi kompat, tapi...
+    String? imagePath,
   }) async {
-    final url = _buildUri('garansis'); // sesuaikan jika rute berbeda
+    final url = _buildUri('garansis');
     final headers = await _authorizedHeaders(jsonContent: true);
 
     final payload = <String, dynamic>{
@@ -1512,89 +1512,233 @@ static Future<bool> createReturn({
       'customer_id': customerId,
       'customer_categories_id': categoryId,
       'phone': phone,
-      'address': address, // array
-      'products': products, // array
+      'address': address,
+      'products': products,
       'purchase_date': purchaseDate,
       'claim_date': claimDate,
-      'status': status,
+      'status_pengajuan': status,             
       if (reason != null && reason.isNotEmpty) 'reason': reason,
       if (note != null && note.isNotEmpty) 'note': note,
       if (imagePath != null && imagePath.isNotEmpty) 'image': imagePath,
     };
 
-    final res =
-        await http.post(url, headers: headers, body: jsonEncode(payload));
-    // ignore: avoid_print
+    final res = await http.post(url, headers: headers, body: jsonEncode(payload));
     print('DEBUG createWarranty => ${res.statusCode} ${res.body}');
     return res.statusCode == 200 || res.statusCode == 201;
   }
 
-  static Future<List<GaransiRow>> fetchWarrantyRows(
-      {int page = 1, int perPage = 20, String? q, String? status}) async {
-    final headers = await _authorizedHeaders();
-    final paths = [
-      'garansis',
-      'warranties',
-      'garansi',
-      'warranty-claims',
-      'warranty_claims'
-    ];
-    for (final p in paths) {
-      final params = <String, String>{
-        'page': '$page',
-        'per_page': '$perPage',
-        if (q != null && q.isNotEmpty) 'filter[search]': q,
-        if (status != null && status.isNotEmpty) 'filter[status]': status,
-      };
-      final uri = _buildUri(p, query: params);
-      final res = await http.get(uri, headers: headers);
-      if (res.statusCode != 200) continue;
-      final items = _extractList(_safeDecode(res.body));
-      if (items.isEmpty) continue;
-      return items.map((raw) {
-        final map = Map<String, dynamic>.from(raw);
-        map['file_pdf_url'] = _absoluteUrl((map['file_pdf_url'] ??
-                map['pdf_url'] ??
-                map['document_url'] ??
-                map['invoice_pdf_url'] ??
-                '')
-            .toString());
-        map['image'] = _absoluteUrl(
-            (map['image'] ?? map['image_url'] ?? '').toString());
-        return GaransiRow.fromJson(map);
-      }).toList();
+  // lib/services/api_service.dart (di dalam class ApiService)
+static Future<bool> updateWarrantyDeliveryImages({
+  required int id,
+  required List<XFile> files,
+}) async {
+  final url = _buildUri('garansis/$id/delivery-images');
+  final headers = await _authorizedHeaders();
+
+  final req = http.MultipartRequest('POST', url);
+  req.headers.addAll(headers);
+  // Jika backend minta PUT/PATCH, boleh aktifkan:
+  // req.fields['_method'] = 'PUT';
+
+  for (final f in files) {
+    if (kIsWeb) {
+      final bytes = await f.readAsBytes();
+      req.files.add(http.MultipartFile.fromBytes(
+        'delivery_images[]',
+        bytes,
+        filename: f.name,
+      ));
+    } else {
+      req.files.add(await http.MultipartFile.fromPath(
+        'delivery_images[]',
+        f.path,
+      ));
     }
-    return <GaransiRow>[];
   }
 
-  static Future<GaransiRow> fetchWarrantyRowDetail(int id) async {
-    final headers = await _authorizedHeaders();
-    final paths = [
-      'garansis/$id',
-      'warranties/$id',
-      'garansi/$id',
-      'warranty-claims/$id',
-      'warranty_claims/$id'
-    ];
-    for (final p in paths) {
-      final uri = _buildUri(p);
-      final res = await http.get(uri, headers: headers);
-      if (res.statusCode != 200) continue;
-      final decoded = _safeDecode(res.body);
-      final data = (decoded is Map) ? (decoded['data'] ?? decoded) : decoded;
-      final map = Map<String, dynamic>.from(data as Map);
-      map['file_pdf_url'] = _absoluteUrl((map['file_pdf_url'] ??
-              map['pdf_url'] ??
-              map['document_url'] ??
-              map['invoice_pdf_url'] ??
-              '')
-          .toString());
-      map['image'] =
-          _absoluteUrl((map['image'] ?? map['image_url'] ?? '').toString());
-      return GaransiRow.fromJson(map);
+  final streamed = await req.send();
+  final res = await http.Response.fromStream(streamed);
+  print('DEBUG updateWarrantyDeliveryImages => ${res.statusCode} ${res.body}');
+  return res.statusCode == 200 || res.statusCode == 201;
+}
+
+
+  // Cari ID garansi berdasarkan nomor (no_garansi / warranty_no / no)
+  static Future<int?> resolveWarrantyIdByNumber(String no) async {
+  if (no.trim().isEmpty) return null;
+  final headers = await _authorizedHeaders();
+
+  // cari langsung berdasarkan nomor
+  final uri = _buildUri('garansis', query: {
+    'filter[search]': no,
+    'per_page': '5',
+  });
+
+  try {
+    final res = await http.get(uri, headers: headers);
+    if (res.statusCode != 200) {
+      print('resolveWarrantyIdByNumber FAILED ${res.statusCode}');
+      return null;
     }
-    throw Exception('GET /garansis/$id not found');
+
+    final items = _extractList(_safeDecode(res.body));
+    if (items.isEmpty) return null;
+
+    // cari yang match no_garansi / warranty_no / no
+    final target = items.firstWhere(
+      (e) {
+        final m = Map<String, dynamic>.from(e);
+        final a = (m['no_garansi'] ?? '').toString().trim().toLowerCase();
+        final b = (m['warranty_no'] ?? '').toString().trim().toLowerCase();
+        final c = (m['no'] ?? '').toString().trim().toLowerCase();
+        final n = no.trim().toLowerCase();
+        return a == n || b == n || c == n;
+      },
+      orElse: () => items.first,
+    );
+
+    final m = Map<String, dynamic>.from(target);
+    final id = int.tryParse(
+      '${m['id'] ?? m['garansi_id'] ?? m['warranty_id'] ?? m['warranty_claim_id'] ?? ''}',
+    );
+
+    print('resolveWarrantyIdByNumber => $no -> id=$id');
+    return id;
+  } catch (e) {
+    print('resolveWarrantyIdByNumber ERROR: $e');
+    return null;
   }
+}
+
+
+  // ---------- Helpers kecil: amanin string ----------
+  static String _s(dynamic v) {
+    if (v == null) return '';
+    final s = v.toString().trim();
+    // anggap "null" / "-" / kosong = tidak ada nilai
+    if (s.isEmpty) return '';
+    final lower = s.toLowerCase();
+    if (lower == 'null' || lower == '-') return '';
+    return s;
+  }
+
+
+  static Future<List<GaransiRow>> fetchWarrantyRows({
+    int page = 1,
+    int perPage = 20,
+    String? q,
+    String? status,
+    }) async {
+      final headers = await _authorizedHeaders();
+      final paths = ['garansis','warranties','garansi','warranty-claims','warranty_claims'];
+      for (final p in paths) {
+        final params = <String, String>{
+          'page': '$page',
+          'per_page': '$perPage',
+          if (q != null && q.isNotEmpty) 'filter[search]': q,
+          if (status != null && status.isNotEmpty) 'filter[status_pengajuan]': status, // ✅ hanya ini
+          
+        };
+        final uri = _buildUri(p, query: params);
+        final res = await http.get(uri, headers: headers);
+        if (res.statusCode != 200) continue;
+
+        final items = _extractList(_safeDecode(res.body));
+        if (items.isEmpty) continue;
+
+        return items.map((raw) {
+          final map = Map<String, dynamic>.from(raw);
+
+          map['file_pdf_url'] = _absoluteUrl(
+            (map['file_pdf_url'] ?? map['pdf_url'] ?? map['document_url'] ?? map['invoice_pdf_url'] ?? '').toString(),
+          );
+
+          // gambar → absolut + pisahkan
+          final imagesRaw = map['image'] ?? map['images'] ?? map['image_url'] ?? map['image_urls'] ?? map['photos'] ?? map['garansi_images'];
+          final deliveryRaw = map['delivery_images'] ?? map['delivery_image'] ?? map['delivery_photos'] ?? map['shipping_images'] ?? map['pengiriman_images'];
+          map['image'] = _absoluteUrlList(imagesRaw);
+          map['delivery_images'] = _absoluteUrlList(deliveryRaw);
+
+          // normalisasi field baru
+          map['status_pengajuan'] = _s(map['status_pengajuan']).isNotEmpty ? map['status_pengajuan']
+                                : _s(map['statusPengajuan']).isNotEmpty ? map['statusPengajuan']
+                                : _s(map['status']); // ← fallback TERIMA yang lama
+          map['status_produk'] =
+                                  _s(map['status_produk']).isNotEmpty ? map['status_produk']
+                                : _s(map['statusProduk']).isNotEmpty ? map['statusProduk']
+                                : _s(map['product_status']).isNotEmpty ? map['product_status']
+                                : _s(map['status_product']).isNotEmpty ? map['status_product'] // ⟵ alias tambahan
+                                : _s(map['productStatus']).isNotEmpty ? map['productStatus']   // ⟵ alias tambahan
+                                : '';
+          map['status_garansi']   = _s(map['status_garansi']).isNotEmpty ? map['status_garansi']
+                                : _s(map['statusGaransi']).isNotEmpty ? map['statusGaransi']
+                                : _s(map['warranty_status']);
+          map['batas_hold']       = _s(map['batas_hold']).isNotEmpty ? map['batas_hold']
+                                : _s(map['batasHold']).isNotEmpty ? map['batasHold']
+                                : _s(map['hold_until']).isNotEmpty ? map['hold_until']
+                                : _s(map['hold_limit']).isNotEmpty ? map['hold_limit']
+                                : _s(map['hold_deadline']);
+          map['alasan_hold']      = _s(map['alasan_hold']).isNotEmpty ? map['alasan_hold']
+                                : _s(map['alasanHold']).isNotEmpty ? map['alasanHold']
+                                : _s(map['hold_reason']);
+
+          return GaransiRow.fromJson(map);
+        }).toList();
+      }
+      return <GaransiRow>[];
+    }
+
+
+  static Future<GaransiRow> fetchWarrantyRowDetail(int id) async {
+  final headers = await _authorizedHeaders();
+  final paths = ['garansis/$id','warranties/$id','garansi/$id','warranty-claims/$id','warranty_claims/$id'];
+  for (final p in paths) {
+    final uri = _buildUri(p);
+    final res = await http.get(uri, headers: headers);
+    if (res.statusCode != 200) continue;
+
+    final decoded = _safeDecode(res.body);
+    final data = (decoded is Map) ? (decoded['data'] ?? decoded) : decoded;
+    final map = Map<String, dynamic>.from(data as Map);
+
+    map['file_pdf_url'] = _absoluteUrl(
+      (map['file_pdf_url'] ?? map['pdf_url'] ?? map['document_url'] ?? map['invoice_pdf_url'] ?? '').toString(),
+    );
+
+    // gambar
+    final imagesRaw = map['image'] ?? map['images'] ?? map['image_url'] ?? map['image_urls'] ?? map['photos'] ?? map['garansi_images'];
+    final deliveryRaw = map['delivery_images'] ?? map['delivery_image'] ?? map['delivery_photos'] ?? map['shipping_images'] ?? map['pengiriman_images'];
+    map['image'] = _absoluteUrlList(imagesRaw);
+    map['delivery_images'] = _absoluteUrlList(deliveryRaw);
+
+    // normalisasi (fallback masih menerima 'status' bila server lama)
+    map['status_pengajuan'] = _s(map['status_pengajuan']).isNotEmpty ? map['status_pengajuan']
+                          : _s(map['statusPengajuan']).isNotEmpty ? map['statusPengajuan']
+                          : _s(map['status']);
+    map['status_produk']    = _s(map['status_produk']).isNotEmpty ? map['status_produk']
+                          : _s(map['statusProduk']).isNotEmpty ? map['statusProduk']
+                          : _s(map['product_status']);
+    map['status_garansi']   = _s(map['status_garansi']).isNotEmpty ? map['status_garansi']
+                          : _s(map['statusGaransi']).isNotEmpty ? map['statusGaransi']
+                          : _s(map['warranty_status']);
+    map['batas_hold']       = _s(map['batas_hold']).isNotEmpty ? map['batas_hold']
+                          : _s(map['batasHold']).isNotEmpty ? map['batasHold']
+                          : _s(map['hold_until']).isNotEmpty ? map['hold_until']
+                          : _s(map['hold_limit']).isNotEmpty ? map['hold_limit']
+                          : _s(map['hold_deadline']);
+    map['alasan_hold']      = _s(map['alasan_hold']).isNotEmpty ? map['alasan_hold']
+                          : _s(map['alasanHold']).isNotEmpty ? map['alasanHold']
+                          : _s(map['hold_reason']);
+
+    return GaransiRow.fromJson(map);
+  }
+
+  
+  
+
+  throw Exception('GET /garansis/$id not found');
+}
+
 
   // ---------- Utility ----------
   static String get _origin {
@@ -1611,4 +1755,34 @@ static Future<bool> createReturn({
     final path = maybe.startsWith('/') ? maybe : '/$maybe';
     return '$_origin$path';
   }
+
+  // --- Helpers array URL gambar ---  // ⟵ BARU
+static List<String> _absoluteUrlList(dynamic raw) {
+  if (raw == null) return const [];
+  if (raw is String) {
+    final s = raw.trim();
+    return s.isEmpty ? const [] : <String>[_absoluteUrl(s)];
+  }
+  if (raw is List) {
+    return raw
+        .map((e) {
+          if (e == null) return null;
+          if (e is String) return _absoluteUrl(e.trim());
+          if (e is Map) {
+            final url = (e['url'] ?? e['path'] ?? e['image'] ?? e['src'] ?? '').toString();
+            return url.isEmpty ? null : _absoluteUrl(url);
+          }
+          return _absoluteUrl(e.toString());
+        })
+        .whereType<String>()
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+  if (raw is Map) {
+    final url = (raw['url'] ?? raw['path'] ?? raw['image'] ?? raw['src'] ?? '').toString();
+    return url.isEmpty ? const [] : <String>[_absoluteUrl(url)];
+  }
+  return const [];
+}
+
 }
